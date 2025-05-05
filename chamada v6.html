@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Presença</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-bottom: 60px;
+            background-color: #f8f9fa;
+        }
+        .fixed-bottom-btn {
+            margin: 10px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .student-item {
+            border-bottom: 1px solid #eee;
+            padding: 15px 0;
+            background-color: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            padding: 15px;
+        }
+        .form-check-input:checked {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        .header {
+            background-color: #343a40;
+            color: white;
+            padding: 15px 0;
+            margin-bottom: 20px;
+            border-radius: 0 0 10px 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <h4>Registro de Faltas</h4>
+        <small class="text-light">Escola Exemplo - Turma Única</small>
+    </div>
+    
+    <div class="container mt-1">
+        <div id="studentList">
+            <!-- Lista de alunos será gerada aqui -->
+        </div>
+        
+        <div class="alert alert-info mt-3">
+            <small>Marque os alunos faltantes e clique em "Enviar SMS" abaixo.</small>
+        </div>
+    </div>
+    
+    <div class="fixed-bottom d-flex justify-content-center">
+        <button id="sendSmsBtn" class="btn btn-danger btn-lg fixed-bottom-btn">
+            📱 Enviar SMS das Faltas
+        </button>
+    </div>
+
+    <!-- Modal de confirmação -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Confirmar Envio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Você vai enviar um SMS com a seguinte mensagem:</p>
+                    <div class="alert alert-light">
+                        <p id="smsMessagePreview"></p>
+                    </div>
+                    <div class="alert alert-warning">
+                        <small>O smartphone abrirá o app de mensagens com o texto pronto para enviar.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="confirmSendBtn">Abrir Mensagem</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Dados dos alunos conforme solicitado
+        const students = [
+            { 
+                id: 1, 
+                name: "Antônio", 
+                phone: "21975477253", 
+                responsible: "Responsável: (21) 97547-7253" 
+            },
+            { 
+                id: 2, 
+                name: "Maria", 
+                phone: "21982006325", 
+                responsible: "Responsável: (21) 98200-6325" 
+            }
+        ];
+
+        // Variável para armazenar alunos faltantes
+        let absentStudents = [];
+
+        // Função para renderizar a lista de alunos
+        function renderStudentList() {
+            const studentListElement = document.getElementById('studentList');
+            studentListElement.innerHTML = '';
+
+            students.forEach(student => {
+                const studentElement = document.createElement('div');
+                studentElement.className = 'student-item d-flex justify-content-between align-items-center';
+                studentElement.innerHTML = `
+                    <div>
+                        <h5 class="mb-1">${student.name}</h5>
+                        <small class="text-muted">${student.responsible}</small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input absent-checkbox" type="checkbox" 
+                               id="absent-${student.id}" data-id="${student.id}">
+                        <label class="form-check-label" for="absent-${student.id}">Faltou?</label>
+                    </div>
+                `;
+                studentListElement.appendChild(studentElement);
+            });
+
+            // Adiciona eventos aos checkboxes
+            document.querySelectorAll('.absent-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const studentId = parseInt(this.dataset.id);
+                    if (this.checked) {
+                        if (!absentStudents.includes(studentId)) {
+                            absentStudents.push(studentId);
+                        }
+                    } else {
+                        absentStudents = absentStudents.filter(id => id !== studentId);
+                    }
+                });
+            });
+        }
+
+        // Função para enviar SMS único com todas as faltas
+        function sendCombinedSms() {
+            const absentList = students.filter(student => absentStudents.includes(student.id));
+            
+            if (absentList.length === 0) return;
+            
+            // Cria mensagem única com todos os alunos faltantes
+            let message = "Atenção! Os seguintes alunos faltaram hoje:\n\n";
+            
+            absentList.forEach(student => {
+                message += `• ${student.name}\n`;
+            });
+            
+            message += "\nAtenciosamente, Escola.";
+            
+            // Pega o primeiro número da lista (poderia ser um número fixo da escola também)
+            const firstPhone = absentList[0].phone;
+            
+            // Abre o app de mensagens com a mensagem combinada
+            window.location.href = `sms:${firstPhone}?body=${encodeURIComponent(message)}`;
+            
+            // Limpa as faltas após envio
+            absentStudents = [];
+            document.querySelectorAll('.absent-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        }
+
+        // Evento do botão de enviar SMS
+        document.getElementById('sendSmsBtn').addEventListener('click', function() {
+            if (absentStudents.length === 0) {
+                alert('Por favor, marque os alunos faltantes antes de enviar.');
+                return;
+            }
+            
+            const absentList = students.filter(student => absentStudents.includes(student.id));
+            
+            // Prepara a mensagem de preview
+            let previewMessage = "Atenção! Os seguintes alunos faltaram hoje:\n\n";
+            absentList.forEach(student => {
+                previewMessage += `• ${student.name}\n`;
+            });
+            previewMessage += "\nAtenciosamente, Escola.";
+            
+            document.getElementById('smsMessagePreview').innerText = previewMessage;
+            
+            const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            confirmModal.show();
+        });
+
+        // Evento de confirmação de envio
+        document.getElementById('confirmSendBtn').addEventListener('click', function() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+            modal.hide();
+            sendCombinedSms();
+        });
+
+        // Inicializa a lista de alunos
+        renderStudentList();
+    </script>
+</body>
+</html>
